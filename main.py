@@ -4,10 +4,6 @@ import random
 import yt_dlp
 from supabase import create_client, Client
 from dotenv import load_dotenv
-import pytz
-from datetime import datetime, time
-import schedule
-import time as time_module
 
 # --- Yapılandırma ---
 load_dotenv()
@@ -95,14 +91,15 @@ def download_video_audio(video_url: str, video_title: str) -> str | None:
             ]),
             'Accept-Language': 'en-US,en;q=0.9'
         },
-        'age_limit': 18,
-        'ignoreerrors': False
+        'age_limit': 18,  # Yaş sınırlı içerikler için
+        'ignoreerrors': False  # Hataları göster
     }
 
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             ydl.download([video_url])
             
+        # İndirilen dosyayı bul
         for file in os.listdir(DOWNLOAD_DIR):
             if file.startswith(safe_title) and file.endswith('.mp3'):
                 return os.path.join(DOWNLOAD_DIR, file)
@@ -121,7 +118,7 @@ def upload_to_supabase(file_path: str) -> bool:
                 file=f,
                 file_options={
                     'content-type': 'audio/mpeg',
-                    'upsert': 'true'
+                    'upsert': 'true'  # DÜZELTME: True -> 'true'
                 }
             )
         return True
@@ -135,48 +132,32 @@ def cleanup():
         shutil.rmtree(DOWNLOAD_DIR)
         print("🗑️ İndirme klasörü temizlendi")
 
-def run_pipeline():
-    print("\n" + "="*50)
-    print(f"YouTube → Supabase Audio Pipeline - {datetime.now(pytz.timezone('Europe/Istanbul')).strftime('%Y-%m-%d %H:%M:%S')}")
-    print("="*50 + "\n")
-
+# --- Ana İşlem ---
+if __name__ == "__main__":
     if not all([SUPABASE_URL, SUPABASE_KEY, CHANNEL_URL]):
         print("✗ Ortam değişkenleri eksik! .env dosyasını kontrol edin")
-        return
+        exit(1)
+
+    print("\n" + "="*50)
+    print("YouTube → Supabase Audio Pipeline")
+    print("="*50 + "\n")
 
     # 1. Son videoyu al
     if not (video := get_latest_video_info(CHANNEL_URL)):
-        return
+        exit(1)
 
     print(f"🔍 Bulunan video: {video['title']}")
 
     # 2. Ses dosyasını indir
     if not (audio_path := download_video_audio(video['url'], video['title'])):
         cleanup()
-        return
+        exit(1)
 
     # 3. Supabase'e yükle
     if not upload_to_supabase(audio_path):
         cleanup()
-        return
+        exit(1)
 
     # 4. Temizlik
     cleanup()
     print("\n✅ İşlem tamamlandı\n")
-
-def schedule_job():
-    # Turkey Time (UTC+3)
-    turkey_time = pytz.timezone('Europe/Istanbul')
-    
-    # Schedule daily at 20:00 Turkey Time
-    schedule.every().day.at("20:00", timezone=turkey_time).do(run_pipeline)
-    
-    print("Scheduler started. Waiting for 20:00 Turkey Time...")
-    
-    while True:
-        schedule.run_pending()
-        time_module.sleep(60)  # Check every minute
-
-if __name__ == "__main__":
-    # For Render.com, we'll use the scheduler
-    schedule_job()
