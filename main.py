@@ -58,49 +58,71 @@ def get_latest_video_info(channel_url: str) -> dict | None:
         return None
 
 def download_video_audio(video_url: str, video_title: str) -> str | None:
-    """Bir videonun sesini MP3 olarak indirir."""
-    os.makedirs(DOWNLOAD_DIR, exist_ok=True) # İndirme klasörünü oluştur (varsa dokunma)
-
-    # Dosya adı için video başlığını güvenli hale getir
+    """Bir videonun sesini MP3 olarak indirir. Bot tespitine karşı çerez kullanır."""
+    os.makedirs(DOWNLOAD_DIR, exist_ok=True)
     safe_title = "".join(c if c.isalnum() or c in (' ', '-', '_') else '_' for c in video_title).rstrip()
-    # Aynı isimde dosya varsa üzerine yazılmaması için ID eklenebilir veya benzersiz bir isim üretilebilir.
-    # Şimdilik basit tutuyoruz, yt-dlp'nin üreteceği isme güveniyoruz (genellikle başlık içerir).
-    # yt-dlp'ye çıktı şablonunu vererek dosya adını daha iyi kontrol edebiliriz.
     output_template = os.path.join(DOWNLOAD_DIR, f"{safe_title}.%(ext)s")
 
+    user_agents = [
+        # ... (user_agents listesi aynı kalabilir) ...
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+        'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:89.0) Gecko/20100101 Firefox/89.0',
+        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:89.0) Gecko/20100101 Firefox/89.0',
+        'Mozilla/5.0 (iPhone; CPU iPhone OS 14_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0.3 Mobile/15E148 Safari/604.1'
+    ]
+
     ydl_opts = {
-        'format': 'bestaudio/best',  # En iyi kalitede sesi seç
-        'outtmpl': output_template,   # İndirilecek dosyanın adı ve yolu için şablon
+        'format': 'bestaudio/best',
+        'outtmpl': output_template,
         'postprocessors': [{
-            'key': 'FFmpegExtractAudio', # Sesi ayıkla
-            'preferredcodec': 'mp3',     # MP3 formatına dönüştür
-            'preferredquality': '192',   # MP3 kalitesi (örneğin 192 Kbps)
+            'key': 'FFmpegExtractAudio',
+            'preferredcodec': 'mp3',
+            'preferredquality': '192',
         }],
-        'quiet': False,             # İndirme sırasında ilerlemeyi göster
-        'no_warnings': False,
-        'retries': 3,               # İndirme başarısız olursa 3 kez tekrar dene
+        'quiet': False,
+        'no_warnings': False, # Hataları görmek için
+        'retries': 3, # Çerezlerle birlikte daha az deneme yeterli olabilir
+        'fragment_retries': 3,
+        'socket_timeout': 30,
+        # 'sleep_interval': random.uniform(1, 2), # Çerezlerle bu kadar beklemeye gerek kalmayabilir
+        # 'max_sleep_interval': random.uniform(2, 4),
+        'http_headers': { # Başlıklar hala faydalı olabilir
+            'User-Agent': random.choice(user_agents),
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.5',
+        },
+        'cookies': 'cookies.txt',  # <-- YENİ EKLENEN SATIR: Çerez dosyasının adını belirtin
+        'ignoreerrors': True, # Hata durumunda devam etmeye çalışabilir veya False yaparak hatayı direkt görebilirsiniz
     }
-    print(f"'{video_title}' videosunun sesi indiriliyor...")
+    print(f"'{video_title}' videosunun sesi indiriliyor (ÇEREZLER ile)...")
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             error_code = ydl.download([video_url])
+            # ... (fonksiyonun geri kalanı aynı) ...
             if error_code != 0:
                 print(f"Ses indirilirken bir sorun oluştu (yt-dlp hata kodu: {error_code}).")
                 return None
 
-        # İndirilen MP3 dosyasını bul (FFmpeg sonrası adı değişebilir)
+        # ... (dosya bulma mantığı aynı) ...
         for f in os.listdir(DOWNLOAD_DIR):
-            # Dosya adının video başlığıyla başladığını ve .mp3 ile bittiğini kontrol et
             if f.startswith(safe_title) and f.endswith(".mp3"):
                 downloaded_file_path = os.path.join(DOWNLOAD_DIR, f)
                 print(f"Ses dosyası başarıyla indirildi: {downloaded_file_path}")
                 return downloaded_file_path
         
-        print("İndirilen MP3 dosyası bulunamadı. Çıktı şablonu veya dosya adı kontrol edilmeli.")
+        print(f"İndirilen MP3 dosyası '{safe_title}' ile başlayan bulunamadı.")
+        for f in os.listdir(DOWNLOAD_DIR):
+            if f.endswith(".mp3"):
+                downloaded_file_path = os.path.join(DOWNLOAD_DIR, f)
+                print(f"Alternatif MP3 dosyası bulundu ve kullanılıyor: {downloaded_file_path}")
+                return downloaded_file_path
+        print("İndirme klasöründe hiçbir MP3 dosyası bulunamadı.")
         return None
 
     except Exception as e:
-        print(f"Ses indirilirken hata: {e}")
+        print(f"Ses indirilirken genel bir hata oluştu: {e}")
         return None
 
 def upload_audio_to_supabase(file_path: str, bucket_name: str) -> bool:
