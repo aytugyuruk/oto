@@ -77,8 +77,8 @@ def fetch_and_upload_today_video():
     except Exception as e:
         print("Hata oluştu:", e)
 
-# Her gün saat 11:00'de çalıştır
-schedule.every().day.at("11:00").do(fetch_and_upload_today_video)
+# Her gün saat 17:00'de çalıştır
+schedule.every().day.at("17:00").do(fetch_and_upload_today_video)
 
 print("Zamanlayıcı başlatıldı.")
 while True:
