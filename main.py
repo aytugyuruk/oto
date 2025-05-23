@@ -6,12 +6,13 @@ from datetime import datetime, timezone
 import schedule
 import time
 
-# Ortam değişkenlerini yükle
+# Ortam değişkenlerini yükle (.env dosyasından)
 load_dotenv()
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 CHANNEL_URL = os.getenv("CHANNEL_URL")
 
+# Supabase istemcisi oluştur
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 def upload_to_supabase(file_path):
@@ -24,24 +25,32 @@ def fetch_and_upload_today_video():
     print("Kontrol başlatıldı:", datetime.now())
     ydl_opts = {
         'quiet': True,
-        'skip_download': True,
         'extract_flat': True,
         'force_generic_extractor': True,
+        'skip_download': True
     }
 
-    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-        info = ydl.extract_info(CHANNEL_URL, download=False)
-        entries = info.get("entries", [])
-        if not entries:
-            print("Kanalda video bulunamadı.")
-            return
+    try:
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(CHANNEL_URL, download=False)
+            entries = info.get("entries", [])
+            if not entries:
+                print("Kanalda video bulunamadı.")
+                return
 
-        latest_video = entries[0]
-        video_url = latest_video['url']
-        upload_date = latest_video.get("upload_date")  # Format: YYYYMMDD
+            latest_video = entries[0]
+            upload_date = latest_video.get("upload_date")  # Format: YYYYMMDD
 
-        today_str = datetime.now(timezone.utc).strftime('%Y%m%d')
-        if upload_date == today_str:
+            if not upload_date:
+                print("Upload tarihi alınamadı, işlem atlandı.")
+                return
+
+            today_str = datetime.now(timezone.utc).strftime('%Y%m%d')
+            if upload_date != today_str:
+                print("Bugün yeni video yüklenmemiş.")
+                return
+
+            video_url = latest_video['url']
             print("Bugün yüklenen video bulundu:", latest_video["title"])
 
             audio_opts = {
@@ -64,10 +73,11 @@ def fetch_and_upload_today_video():
                     upload_to_supabase(file_path)
                     print("Yüklendi:", file)
                     os.remove(file_path)
-        else:
-            print("Bugün video yüklenmemiş.")
 
-# Her gün saat 11:00'de çalış
+    except Exception as e:
+        print("Hata oluştu:", e)
+
+# Her gün saat 11:00'de çalıştır
 schedule.every().day.at("11:00").do(fetch_and_upload_today_video)
 
 print("Zamanlayıcı başlatıldı.")
