@@ -5,15 +5,18 @@ from dotenv import load_dotenv
 from datetime import datetime, timezone
 import schedule
 import time
+import threading
+from flask import Flask
 
-# Ortam değişkenlerini yükle (.env dosyasından)
+# Ortam değişkenlerini yükle
 load_dotenv()
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 CHANNEL_URL = os.getenv("CHANNEL_URL")
 
-# Supabase istemcisi oluştur
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
+
+app = Flask(__name__)
 
 def upload_to_supabase(file_path):
     bucket_name = "audio"
@@ -22,7 +25,7 @@ def upload_to_supabase(file_path):
         supabase.storage.from_(bucket_name).upload(file_name, f.read(), {"content-type": "audio/mpeg"})
 
 def fetch_and_upload_today_video():
-    print("Kontrol başlatıldı:", datetime.now())
+    print("Kontrol başladı:", datetime.now())
     ydl_opts = {
         'quiet': True,
         'extract_flat': True,
@@ -77,10 +80,20 @@ def fetch_and_upload_today_video():
     except Exception as e:
         print("Hata oluştu:", e)
 
-# Her gün saat 17:00'de çalıştır
-schedule.every().day.at("17:00").do(fetch_and_upload_today_video)
+def run_schedule():
+    # Türkiye saati 20:00 → UTC 17:00
+    schedule.every().day.at("17:00").do(fetch_and_upload_today_video)
+    while True:
+        schedule.run_pending()
+        time.sleep(30)
 
-print("Zamanlayıcı başlatıldı.")
-while True:
-    schedule.run_pending()
-    time.sleep(60)
+@app.route("/")
+def index():
+    return "YouTube Ses Yükleyici Bot çalışıyor..."
+
+if __name__ == "__main__":
+    thread = threading.Thread(target=run_schedule)
+    thread.daemon = True
+    thread.start()
+    # Render için portu 8000 olarak açıyoruz
+    app.run(host="0.0.0.0", port=8000)
