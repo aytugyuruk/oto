@@ -14,15 +14,28 @@ SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 CHANNEL_URL = os.getenv("CHANNEL_URL")
 
-supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
+# Supabase bağlantısını kurma
+try:
+    supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
+    print("Supabase bağlantısı başarılı!")
+except Exception as e:
+    print(f"Supabase bağlantısı sırasında bir hata oluştu: {e}")
+    exit(1)
 
 app = Flask(__name__)
 
 def upload_to_supabase(file_path):
     bucket_name = "audio"
     file_name = os.path.basename(file_path)
-    with open(file_path, "rb") as f:
-        supabase.storage.from_(bucket_name).upload(file_name, f.read(), {"content-type": "audio/mpeg"})
+    try:
+        with open(file_path, "rb") as f:
+            response = supabase.storage.from_(bucket_name).upload(file_name, f.read(), {"content-type": "audio/mpeg"})
+            if response.status_code == 200:
+                print(f"Dosya {file_name} başarıyla yüklendi.")
+            else:
+                print(f"Yükleme sırasında bir hata oluştu: {response.status_code} - {response.text}")
+    except Exception as e:
+        print(f"Dosya yüklenirken hata oluştu: {e}")
 
 def fetch_and_upload_today_video():
     print("Kontrol başladı:", datetime.now())
@@ -53,7 +66,11 @@ def fetch_and_upload_today_video():
                 print("Bugün yeni video yüklenmemiş.")
                 return
 
-            video_url = latest_video['url']
+            video_url = latest_video.get('url', None)
+            if not video_url:
+                print("Video URL'si alınamadı, işlem atlandı.")
+                return
+
             print("Bugün yüklenen video bulundu:", latest_video["title"])
 
             audio_opts = {
@@ -67,8 +84,12 @@ def fetch_and_upload_today_video():
 
             os.makedirs("downloads", exist_ok=True)
 
-            with yt_dlp.YoutubeDL(audio_opts) as ydl2:
-                ydl2.download([f"https://www.youtube.com/watch?v={video_url}"])
+            try:
+                with yt_dlp.YoutubeDL(audio_opts) as ydl2:
+                    ydl2.download([f"https://www.youtube.com/watch?v={video_url}"])
+            except Exception as e:
+                print(f"Video indirme sırasında hata oluştu: {e}")
+                return
 
             for file in os.listdir("downloads"):
                 if file.endswith(".mp3"):
@@ -78,13 +99,17 @@ def fetch_and_upload_today_video():
                     os.remove(file_path)
 
     except Exception as e:
-        print("Hata oluştu:", e)
+        print(f"Genel hata oluştu: {e}")
 
 # Manuel tetikleme için endpoint
 @app.route("/run-now")
 def run_now():
-    threading.Thread(target=fetch_and_upload_today_video).start()
-    return "Video kontrolü ve yükleme işlemi başlatıldı."
+    try:
+        threading.Thread(target=fetch_and_upload_today_video).start()
+        return "Video kontrolü ve yükleme işlemi başlatıldı."
+    except Exception as e:
+        print(f"Manuel tetikleme sırasında hata oluştu: {e}")
+        return "Bir hata oluştu, lütfen tekrar deneyin."
 
 # Başlangıç sayfası
 @app.route("/")
@@ -92,4 +117,7 @@ def index():
     return "YouTube Ses Yükleyici Bot çalışıyor..."
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=8000)
+    try:
+        app.run(host="0.0.0.0", port=8000)
+    except Exception as e:
+        print(f"Flask sunucusu başlatılırken hata oluştu: {e}")
