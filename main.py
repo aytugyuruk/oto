@@ -10,9 +10,9 @@ from flask import Flask
 
 # Ortam değişkenlerini yükle
 load_dotenv()
-SUPABASE_URL = os.getenv("SUPABASE_URL")
-SUPABASE_KEY = os.getenv("SUPABASE_KEY")
-CHANNEL_URL = os.getenv("CHANNEL_URL")
+SUPABASE_URL = os.getenv("https://apsjoooxoxnlydqebxlc.supabase.co")
+SUPABASE_KEY = os.getenv("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFwc2pvb294b3hubHlkcWVieGxjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDc5MzAwMjMsImV4cCI6MjA2MzUwNjAyM30.QgsraCYe_hc9m72Tgbl4hYWIMO1JGyPu1Qh51w7j1Vs")
+CHANNEL_URL = os.getenv("https://youtube.com/@5dakikadayks?si=VGT7UOKn8f7o_o3_")
 
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
