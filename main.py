@@ -111,7 +111,6 @@ def download_video_audio(video_url: str, video_title: str) -> str | None:
         return None
 
 def upload_to_supabase(file_path: str) -> bool:
-    """Supabase'e dosya yükler"""
     try:
         with open(file_path, 'rb') as f:
             supabase.storage.from_(BUCKET_NAME).upload(
@@ -119,13 +118,12 @@ def upload_to_supabase(file_path: str) -> bool:
                 file=f,
                 file_options={
                     'content-type': 'audio/mpeg',
-                    'upsert': True  # Varsa üzerine yaz
+                    'upsert': 'true'  # DÜZELTME: True -> 'true'
                 }
             )
-        print(f"✓ Yükleme başarılı: {os.path.basename(file_path)}")
         return True
     except Exception as e:
-        print(f"✗ Yükleme hatası: {str(e)}")
+        print(f"✗ Supabase yükleme hatası: {str(e)}")
         return False
 
 def cleanup():
