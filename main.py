@@ -82,7 +82,7 @@ def fetch_and_upload_today_video():
 
 def run_schedule():
     # Türkiye saati 20:00 → UTC 17:00
-    schedule.every().day.at("17:00").do(fetch_and_upload_today_video)
+    schedule.every().day.at("17:30").do(fetch_and_upload_today_video)
     while True:
         schedule.run_pending()
         time.sleep(30)
