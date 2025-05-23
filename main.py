@@ -2,6 +2,10 @@ import os
 import shutil
 import random
 import yt_dlp
+import time
+import schedule
+import datetime
+import pytz
 from supabase import create_client, Client
 from dotenv import load_dotenv
 
@@ -132,32 +136,53 @@ def cleanup():
         shutil.rmtree(DOWNLOAD_DIR)
         print("🗑️ İndirme klasörü temizlendi")
 
-# --- Ana İşlem ---
-if __name__ == "__main__":
+# --- Ana Görev Fonksiyonu ---
+def run_pipeline():
     if not all([SUPABASE_URL, SUPABASE_KEY, CHANNEL_URL]):
         print("✗ Ortam değişkenleri eksik! .env dosyasını kontrol edin")
-        exit(1)
+        return
 
     print("\n" + "="*50)
     print("YouTube → Supabase Audio Pipeline")
     print("="*50 + "\n")
+    
+    # Şu anki zamanı yazdır
+    istanbul_tz = pytz.timezone('Europe/Istanbul')
+    now = datetime.datetime.now(istanbul_tz)
+    print(f"📅 Çalışma zamanı: {now.strftime('%Y-%m-%d %H:%M:%S')} (İstanbul)")
 
     # 1. Son videoyu al
     if not (video := get_latest_video_info(CHANNEL_URL)):
-        exit(1)
+        return
 
     print(f"🔍 Bulunan video: {video['title']}")
 
     # 2. Ses dosyasını indir
     if not (audio_path := download_video_audio(video['url'], video['title'])):
         cleanup()
-        exit(1)
+        return
 
     # 3. Supabase'e yükle
     if not upload_to_supabase(audio_path):
         cleanup()
-        exit(1)
+        return
 
     # 4. Temizlik
     cleanup()
     print("\n✅ İşlem tamamlandı\n")
+
+# --- Ana İşlem ---
+if __name__ == "__main__":
+    print("🕒 YouTube → Supabase Audio Pipeline Zamanlanmış Görev")
+    print(f"📌 Her gün İstanbul saatiyle 20:00'de çalışacak şekilde ayarlandı")
+    
+    # İstanbul saat dilimine göre 20:00'de çalışacak şekilde zamanla
+    schedule.every().day.at("20:00").do(run_pipeline)
+    
+    # Bir defa şimdi çalıştırmak isterseniz, aşağıdaki satırı yorum işaretinden kurtarın
+    # run_pipeline()
+    
+    # Programı çalışır durumda tut ve zamanı kontrol et
+    while True:
+        schedule.run_pending()
+        time.sleep(60)  # Her dakika zamanı kontrol et
