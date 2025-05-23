@@ -118,6 +118,6 @@ def index():
 
 if __name__ == "__main__":
     try:
-        app.run(host="0.0.0.0", port=8000)
+        app.run(host="0.0.0.0", port=int(os.getenv("PORT", 8000)))
     except Exception as e:
         print(f"Flask sunucusu başlatılırken hata oluştu: {e}")
