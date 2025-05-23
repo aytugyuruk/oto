@@ -80,20 +80,16 @@ def fetch_and_upload_today_video():
     except Exception as e:
         print("Hata oluştu:", e)
 
-def run_schedule():
-    # Türkiye saati 20:00 → UTC 17:00
-    schedule.every().day.at("17:30").do(fetch_and_upload_today_video)
-    while True:
-        schedule.run_pending()
-        time.sleep(30)
+# Manuel tetikleme için endpoint
+@app.route("/run-now")
+def run_now():
+    threading.Thread(target=fetch_and_upload_today_video).start()
+    return "Video kontrolü ve yükleme işlemi başlatıldı."
 
+# Başlangıç sayfası
 @app.route("/")
 def index():
     return "YouTube Ses Yükleyici Bot çalışıyor..."
 
 if __name__ == "__main__":
-    thread = threading.Thread(target=run_schedule)
-    thread.daemon = True
-    thread.start()
-    # Render için portu 8000 olarak açıyoruz
     app.run(host="0.0.0.0", port=8000)
